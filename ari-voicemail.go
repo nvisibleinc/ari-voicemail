@@ -15,7 +15,6 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"go-ari-library"
-	// "github.com/coopernurse/gorp"
 )
 
 /* Voicemail Users
@@ -38,46 +37,6 @@ read		(bool)
 recording_id	(varchar)
 */
 
-/*	Voicemail Main
-authenticate:
-	voicemail_box
-	pin
-		check if valid
-		true: func(leave), goto(main)
-		false: decrement tries, goto(authenticate)
-
-main:
-	if new messages exist
-		true: play(you have new messages)
-		false: continue
-
-1: new messages
-2: change folders
-	0 new
-	1 old
-	2 work
-	3 family
-	4 friends
-	# cancel
-
-3: advanced options
-	4 outgoing call
-		enter message to call, then press pound, * to cancel
-	5 leave a message
-		1 extension
-		2 directory (won't implement)
-
-0: mailbox options
-	1 unavailable msg
-	2 busy msg
-	3 name
-	4 temporary greeting
-	5 password
-	* main menu
-*: help
-#: exit
-*/
-
 /* Voicemail
 Get mailbox
 Play unavailable / busy message
@@ -93,6 +52,7 @@ Leave message
 	* help
 */
 
+// setup global variables
 var (
 	config       Config
 	db           *sql.DB
@@ -101,6 +61,7 @@ var (
 	insertNewMsg *sql.Stmt
 )
 
+// Config struct contains the variable configuration options from the config file.
 type Config struct {
 	MySQLURL     string      `json:"mysql_url"`
 	Applications []string    `json:"applications"`
@@ -108,6 +69,7 @@ type Config struct {
 	BusConfig    interface{} `json:"bus_config"`
 }
 
+// vmInternal struct holds information about the internal state of a running voicemail application instance.
 type vmInternal struct {
 	Mailbox         string
 	Retries         int
@@ -116,10 +78,12 @@ type vmInternal struct {
 	ActivePlaybacks []string
 }
 
+// AddPlayback adds a playback to the string slice that holds the list of file IDs of the in-flight playback files.
 func (v *vmInternal) AddPlayback(id string) {
 	v.ActivePlaybacks = append(v.ActivePlaybacks, id)
 }
 
+// RemovePlayback removes the file ID of the in-flight playback files as they have been played to the channel.
 func (v *vmInternal) RemovePlayback(id string) {
 	for i := range v.ActivePlaybacks {
 		if v.ActivePlaybacks[i] == id {
@@ -128,6 +92,8 @@ func (v *vmInternal) RemovePlayback(id string) {
 		}
 	}
 }
+
+// initialize the client side configuration and setup.
 func init() {
 	var err error
 
@@ -146,23 +112,24 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// retrieve the messages for the current mailbox and folder
 	getMessages, err = db.Prepare("SELECT * FROM voicemail_messages WHERE mailbox=? AND folder=?")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// get the recording_id containing the appropriate greeting for the current mailbox and folder
 	getGreeting, err = db.Prepare("SELECT recording_id FROM voicemail_messages WHERE mailbox=? AND folder=?")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// insert a new message into the list of voicemail messages for the New folder
 	insertNewMsg, err = db.Prepare("INSERT INTO voicemail_messages values (NULL, ?, ?, 'New', NULL, 0, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// startVMMainApp starts the primary voicemail application for retrieving messages.
-func startVMMainApp(app string) {
-	return
 }
 
 // startVMApp starts the primary voicemail application for leaving messages.
