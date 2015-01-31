@@ -3,19 +3,19 @@ ari-voicemail
 Simple voicemail application using the ARI interface and the Go programming
 language.
 
-This application is designed to work with the [go-ari-proxy][1] and
-[go-ari-library][2], and should not be considered ready for production. Please
+This application is designed to work with the [proxy][1] and
+[library][2], and should not be considered ready for production. Please
 feel free to use this application as a basis of learning and prototyping.
 
 Installation
 ------------
-```go
+```
 $ go build ari-voicemail
 ```
 
 Usage
 -----
-First, build the `go-ari-proxy` application and configure the json file. We
+First, build the `go-ari-proxy` application and configure the JSON file. We
 recommend that you use the [NATS][3] message bus. Alternatively, you could
 implement your own proxy for connecting to the Asterisk REST Interface either
 in your preferred programming lanaguage, or in Go using our handy
@@ -39,6 +39,6 @@ Licensing
 > along with this program; if not, write to the Free Software
 > Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-	[1]: https://github.com/nvisibleinc/go-ari-proxy
-	[2]: https://github.com/nvisibleinc/go-ari-library
-	[3]: https://github.com/derekcollison/nats
+   [1]: https://github.com/nvisibleinc/go-ari-proxy "go-ari-proxy"
+   [2]: https://github.com/nvisibleinc/go-ari-library "go-ari-library"
+   [3]: https://github.com/derekcollison/nats "NATS"
