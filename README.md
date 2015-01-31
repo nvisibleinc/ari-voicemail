@@ -3,8 +3,8 @@ ari-voicemail
 Simple voicemail application using the ARI interface and the Go programming
 language.
 
-This application is designed to work with the [proxy][1] and
-[library][2], and should not be considered ready for production. Please
+This application is designed to work with the [go-ari-proxy][1] and
+[go-ari-library][2], and should not be considered ready for production. Please
 feel free to use this application as a basis of learning and prototyping.
 
 Installation
