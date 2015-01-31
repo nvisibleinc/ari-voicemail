@@ -57,6 +57,7 @@ var (
 	config       Config
 	db           *sql.DB
 	getMessages  *sql.Stmt
+	getMessCount *sql.Stmt
 	getGreeting  *sql.Stmt
 	insertNewMsg *sql.Stmt
 	checkPass    *sql.Stmt
@@ -115,13 +116,17 @@ func init() {
 	}
 
 	// retrieve the messages for the current mailbox and folder
-	getMessages, err = db.Prepare("SELECT * FROM voicemail_messages WHERE mailbox=? AND folder=?")
+	getMessages, err = db.Prepare("SELECT * FROM voicemail_messages WHERE mailbox=? AND domain=? AND folder=?")
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	// get the count of messages in a particular folder
+	getMessCount, err = db.Prepare("SELECT COUNT(*) FROM voicemail_messages WHERE mailbox=? AND domain=? AND folder=?")
+	if err != nil {
+		log.Fatal(err)
+	}
 	// get the recording_id containing the appropriate greeting for the current mailbox and folder
-	getGreeting, err = db.Prepare("SELECT recording_id FROM voicemail_messages WHERE mailbox=? AND folder=?")
+	getGreeting, err = db.Prepare("SELECT recording_id FROM voicemail_messages WHERE mailbox=? AND domain=? AND folder=?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -201,7 +206,7 @@ func introPlayed(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInter
 	select {
 	case event := <-a.Events:
 		switch event.Type {
-		case "PlaybackFinished":				fmt.Println("Got an octothorpe")
+		case "PlaybackFinished":
 			var p ari.PlaybackFinished
 			json.Unmarshal([]byte(event.ARI_Body), &p)
 			vmState.RemovePlayback(p.Playback.Id)
