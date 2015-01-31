@@ -340,50 +340,6 @@ func getGreetURI(mailbox string, greetType string) string {
 	return strings.Join([]string{"recording:", greetingID}, "")
 }
 
-// DEPRECATED: ConsumeEvents pulls events off the channel and passes to the application.
-func startAppHandler(a *ari.AppInstance) {
-	// this is where you would hand off the information to your application
-	for event := range a.Events {
-		fmt.Println("got event")
-		switch event.Type {
-		case "StasisStart":
-			var s ari.StasisStart
-			json.Unmarshal([]byte(event.ARI_Body), &s)
-			a.ChannelsAnswer(s.Channel.Id)
-			fmt.Println("Got start message")
-		case "ChannelDtmfReceived":
-			var c ari.ChannelDtmfReceived
-			fmt.Println("Got DTMF")
-			json.Unmarshal([]byte(event.ARI_Body), &c)
-			fmt.Printf("We got DTMF: %s\n", c.Digit)
-			switch c.Digit {
-			case "1":
-				a.ChannelsPlay(c.Channel.Id, "sound:tt-monkeys", "en")
-			case "2":
-				a.ChannelsPlay(c.Channel.Id, "sound:tt-weasels")
-			case "3":
-				a.ChannelsPlay(c.Channel.Id, "sound:demo-congrats")
-			case "4":
-				err := a.MailboxesUpdate("1234@test", 0, 0)
-				if err != nil {
-					fmt.Println(err)
-				}
-			case "5":
-				m, err := a.MailboxesGet("1234@test")
-				if err != nil {
-					fmt.Println(err)
-				} else {
-					fmt.Printf("Mailbox info is: %v", m)
-				}
-			}
-		case "ChannelHangupRequest":
-			fmt.Println("Channel hung up")
-		case "StasisEnd":
-			fmt.Println("Got end message")
-		}
-	}
-}
-
 // signalCatcher is a function to allows us to stop the application through an
 // operating system signal.
 func signalCatcher() {
