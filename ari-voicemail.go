@@ -59,6 +59,7 @@ var (
 	getMessages  *sql.Stmt
 	getGreeting  *sql.Stmt
 	insertNewMsg *sql.Stmt
+	checkPass    *sql.Stmt
 )
 
 // Config struct contains the variable configuration options from the config file.
@@ -130,11 +131,17 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	
+	// check if a password is correct for the provided mailbox and domain
+	checkPass, err = db.Prepare("SELECT mailbox from voicemail_users where mailbox=? and domain=? and pin=SHA2(?, 256)")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // startVMApp starts the primary voicemail application for leaving messages.
 func startVMApp(app string) {
-	fmt.Printf("Started application: %s", app)
+	fmt.Printf("Started application: %s\n", app)
 	application := new(ari.App)
 	application.Init(app, startVMHandler)
 	select {
@@ -153,6 +160,7 @@ func startVMHandler(a *ari.AppInstance) {
 	for state != nil {
 		state, vmState = state(a, vmState)
 	}
+	fmt.Println("exiting app instance")
 }
 
 func vmstartState(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInternal) {
@@ -175,7 +183,7 @@ func vmstartState(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInte
 				vmState.AddPlayback(pb.Id)
 				pb, _ = a.ChannelsPlay(vmState.ChannelID, "sound:vm-isunavail", "en")
 				vmState.AddPlayback(pb.Id)
-				pb, _ = a.ChannelsPlay(vmState.ChannelID, "sounds:vm-intro")
+				pb, _ = a.ChannelsPlay(vmState.ChannelID, "sound:vm-intro")
 				vmState.AddPlayback(pb.Id)
 			} else {
 				a.ChannelsPlay(vmState.ChannelID, g)
@@ -193,31 +201,39 @@ func introPlayed(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInter
 	select {
 	case event := <-a.Events:
 		switch event.Type {
-		case "PlaybackFinished":
+		case "PlaybackFinished":				fmt.Println("Got an octothorpe")
 			var p ari.PlaybackFinished
 			json.Unmarshal([]byte(event.ARI_Body), &p)
 			vmState.RemovePlayback(p.Playback.Id)
 			if len(vmState.ActivePlaybacks) == 0 {
-				return leaveMessage, vmState
+				return startRecording, vmState
 			}
 			return introPlayed, vmState
 		case "ChannelDtmfReceived":
 			var c ari.ChannelDtmfReceived
 			json.Unmarshal([]byte(event.ARI_Body), &c)
 			switch c.Digit {
-			case "#":
+				case "#":
 				playbacksStop(a, vmState)
-				return leaveMessage, vmState
+				return startRecording, vmState
 			}
 		}
 	}
 	return introPlayed, vmState
 }
 
-func leaveMessage(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInternal) {
+func startRecording(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInternal) {
+	fmt.Println("entered startRecording")
 	messageID := ari.UUID()
 	vmState.ActiveRecording = messageID
-	a.ChannelsRecord(vmState.ChannelID, messageID, "ulaw", "", "", "", "true")
+	pb, _ := a.ChannelsPlay(vmState.ChannelID, "sound:beep")
+	vmState.AddPlayback(pb.Id)
+	a.ChannelsRecord(vmState.ChannelID, messageID, "ulaw")
+	return leaveMessage, vmState
+}
+
+func leaveMessage(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInternal) {
+
 	fmt.Println("entered leaveMessage")
 	select {
 	case event := <-a.Events:
@@ -238,6 +254,8 @@ func leaveMessage(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInte
 			var c ari.ChannelHangupRequest
 			json.Unmarshal([]byte(event.ARI_Body), &c)
 			a.RecordingsStop(vmState.ActiveRecording)
+			saveMessage(vmState)
+			return hangupVM, vmState
 		}
 	}
 	return leaveMessage, vmState
@@ -254,6 +272,8 @@ func listenMessage(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInt
 			switch c.Digit {
 			case "1":
 				playbacksStop(a, vmState)
+				saveMessage(vmState)
+				return hangupVM, vmState
 			case "2":
 				playbacksStop(a, vmState)
 				pb, _ := a.ChannelsPlay(vmState.ChannelID, strings.Join([]string{"recording:", vmState.ActiveRecording}, ""))
@@ -276,6 +296,10 @@ func listenMessage(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInt
 	return listenMessage, vmState
 }
 
+func hangupVM(a *ari.AppInstance, vmState *vmInternal) (vmstateFunc, *vmInternal) {
+	a.ChannelsHangup(vmState.ChannelID)
+	return nil, vmState
+}
 func playbacksStop(a *ari.AppInstance, vmState *vmInternal) {
 	for _, val := range vmState.ActivePlaybacks {
 		a.PlaybacksStop(val)
@@ -307,6 +331,10 @@ func getGreetURI(mailbox string, greetType string) string {
 	return strings.Join([]string{"recording:", greetingID}, "")
 }
 
+func saveMessage(vmState *vmInternal) error {
+	insertNewMsg.Exec(vmState.Mailbox, "example.com", vmState.ActiveRecording);
+	return nil;
+}
 // signalCatcher is a function to allows us to stop the application through an
 // operating system signal.
 func signalCatcher() {
@@ -318,7 +346,7 @@ func signalCatcher() {
 }
 
 func main() {
-	fmt.Println("Welcome to the go-ari-client")
+	fmt.Println("Welcome to the ARI voicemail written in GO")
 	ari.InitBus(config.MessageBus, config.BusConfig)
 
 	for _, app := range config.Applications {
