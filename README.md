@@ -41,4 +41,4 @@ Licensing
 
    [1]: https://github.com/nvisibleinc/go-ari-proxy "go-ari-proxy"
    [2]: https://github.com/nvisibleinc/go-ari-library "go-ari-library"
-   [3]: https://github.com/derekcollison/nats "NATS"
+   [3]: https://github.com/apcera/gnatsd "NATS"
